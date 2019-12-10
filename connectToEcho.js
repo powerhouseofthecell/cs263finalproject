@@ -3,14 +3,33 @@ const bleno = require('@abandonware/bleno');
 
 // once we have performed sniffing via ubertooth, these are targets
 const targetDevices = [
-  "84-ef-18-66-6f-15"
-  // "d0-c5-f3-da-50-1e",  // Nick's iPhone
-  // "e7-7b-15-c6-07-13",  // Tile
-  // "eb-88-da-59-69-d3",  // Tile
-  // "d6-11-dc-91-c4-2e"   // Tile
+  "84-ef-18-66-6f-15" // EchoThisMF service
 ];
 
-let connectedPeripherals = [];
+const data = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
+
+// reads and writes to the provided characteristic 1000 times
+function readWrite(characteristic, peripheral, i=10) {
+  if (i > 0) {
+    characteristic.write(data, true);
+      
+    characteristic.read((error, resp) => {
+      if (error) {
+        console.warn('error: ' + error);
+        return;
+      }
+      readWrite(characteristic, peripheral, i - 1);
+    });
+  } else {
+    console.log('readWrites complete, disconnecting');
+    peripheral.disconnect((error) => {
+      console.log('disconnected from peripheral: ' + peripheral.addrName);
+
+      // now reconnect and do it again!
+      connectToPeripheral(peripheral);
+    });
+  }
+}
 
 // connects to a given peripheral and displays information about it
 function connectToPeripheral(peripheral) {
@@ -20,34 +39,28 @@ function connectToPeripheral(peripheral) {
       peripheral.addrName = peripheralAddrName;
       if (targetDevices.indexOf(peripheral.address) < 0) {
         peripheral.disconnect((error) => {
-          console.log("disconnected from non-target peripheral: " + peripheralAddrName);
+          if (error) {
+            console.warn('disconnect from unwanted peripheral error: ' + error);
+          }
         });
         return;
       } else {
         console.log('connected to target peripheral: ' + peripheralAddrName);
-        connectedPeripherals.push(peripheral);
       }
 
       // display manufacturer data for this peripheral
       console.log(peripheral.advertisement.manufacturerData);
 
-      peripheral.once('rssiUpdate', (rssi) => {
-        console.log('[' + peripheralAddrName + ']: rssi: ' + rssi);
-      });
+      peripheral.discoverAllServicesAndCharacteristics(function(error, services) {
+        console.log('discovered services:');
+        
+        // try to read and write to and from each characteristic
+        services.forEach((service) => {
+          console.log('\tcharacteristics: ' + service.characteristics);
 
-      peripheral.discoverServices(['180a'], function(error, services) {
-        var deviceInformationService = services[0];
-        console.log('discovered device information service');
-        console.log(peripheral.advertisement);
-
-        if (deviceInformationService != null) {
-          deviceInformationService.discoverCharacteristics(null, function(error, characteristics) {
-            console.log('discovered the following characteristics:');
-            for (var i in characteristics) {
-              console.log('\t  ' + i + ' uuid: ' + characteristics[i]);
-            }
-          });
-        }
+          // perform a write and read for each characteristic
+          service.characteristics.forEach((characteristic) => readWrite(characteristic, peripheral));
+        });
 
       });
     } catch {
