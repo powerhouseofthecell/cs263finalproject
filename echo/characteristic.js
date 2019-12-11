@@ -8,17 +8,18 @@ var EchoCharacteristic = function() {
   EchoCharacteristic.super_.call(this, {
     uuid: 'ec0e',
     properties: ['read', 'write', 'notify'],
-    value: null
+    value: null,
+    secure: ['read', 'write', 'notify']
   });
 
-  this._value = new Buffer(0);
+  this._value = Buffer.from("0");
   this._updateValueCallback = null;
 };
 
 util.inherits(EchoCharacteristic, BlenoCharacteristic);
 
 EchoCharacteristic.prototype.onReadRequest = function(offset, callback) {
-  console.log('EchoCharacteristic - onReadRequest: value = ' + this._value.toString('hex'));
+  console.log('EchoCharacteristic - onReadRequest: value = 0x' + this._value.toString('hex'));
 
   callback(this.RESULT_SUCCESS, this._value);
 };
@@ -26,7 +27,7 @@ EchoCharacteristic.prototype.onReadRequest = function(offset, callback) {
 EchoCharacteristic.prototype.onWriteRequest = function(data, offset, withoutResponse, callback) {
   this._value = data;
 
-  console.log('EchoCharacteristic - onWriteRequest: value = ' + this._value.toString('hex'));
+  console.log('EchoCharacteristic - onWriteRequest: value = 0x' + this._value.toString('hex'));
 
   if (this._updateValueCallback) {
     console.log('EchoCharacteristic - onWriteRequest: notifying');
